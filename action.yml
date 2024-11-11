@@ -1,14 +1,33 @@
-name: 'Repo Star Count'
-description: 'Get count of Github repository stars'
+name: 'Repo Discussion Count'
+description: 'Get discussion count of Github repository'
 author: 'Alan He'
 inputs:
-   repo:
-     description: 'Repository Path'
-     required: false
-     default: ${{github.repository}}
+  repoPath:
+    description: 'Repository Path'
+    required: false
+    default: ${{github.repository}}
+  token:
+    description: 'GitHub Token'
+    required: true
+outputs:
+  discussionCount:
+    description: "Repo Discussion Count"
+    value: ${{ steps.repo-discussion.outputs.discussionCount }}  # 确保这里的输出名称与下面的一致
 runs:
+  using: composite
   steps:
+  - id: repo-discussion
     run: |
-      star=`curl -s 'https://api.github.com/repos/${{repo}}?page=$i&per_page=100' | jq .stargazers_count`
-      echo "repoStars=$star" >> $GITHUB_ENV
+      OWNER=$(echo "${{ inputs.repoPath }}" | awk -F '/' '{print $1}')
+      REPO=$(echo "${{ inputs.repoPath }}" | awk -F '/' '{print $2}')
+      RESPONSE=$(curl -s -H "Authorization: bearer ${{ inputs.token }}" \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"query\": \"query { repository(owner: \\\"$OWNER\\\", name: \\\"$REPO\\\") { discussions { totalCount } } }\"}" \
+        https://api.github.com/graphql)
+      COUNT=$(echo "$RESPONSE" | jq '.data.repository.discussions.totalCount')
+      echo "discussionCount=$COUNT" >> $GITHUB_OUTPUT
     shell: bash
+branding:
+  icon: 'award'
+  color: 'blue'
